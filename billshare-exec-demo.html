@@ -1,0 +1,1613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BillShare — Resiliency Command Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cvs-red: #CC0000;
+    --heb-red: #E31837;
+    --command-gold: #C9973A;
+    --command-gold-light: #F0C060;
+    --navy-deep: #080D1A;
+    --navy-mid: #0D1528;
+    --navy-panel: #111B30;
+    --navy-border: #1A2840;
+    --navy-highlight: #1E3058;
+    --text-primary: #E8EDF8;
+    --text-secondary: #7A9CC8;
+    --text-dim: #3A5078;
+    --green-live: #22C55E;
+    --red-urgent: #FF3333;
+    --amber-warn: #F59E0B;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--navy-deep);
+    color: var(--text-primary);
+    font-family: 'Crimson Pro', Georgia, serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(26,40,64,0.4) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(26,40,64,0.4) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    top: -50%;
+    left: -20%;
+    width: 60%;
+    height: 120%;
+    background: radial-gradient(ellipse at center, rgba(204,0,0,0.06) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+  /* ═══════════════════════════════════
+     TOP COMMAND BAR
+  ═══════════════════════════════════ */
+  .command-bar {
+    background: rgba(8,13,26,0.95);
+    border-bottom: 1px solid var(--navy-border);
+    backdrop-filter: blur(20px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    padding: 0 24px;
+  }
+
+  .command-bar-inner {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    height: 56px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .ticker-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 18px;
+    border-right: 1px solid var(--navy-border);
+    height: 100%;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+  }
+
+  .ticker-label { color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+  .ticker-value { color: var(--text-primary); font-weight: 600; }
+  .ticker-value.green { color: var(--green-live); }
+  .ticker-value.gold { color: var(--command-gold-light); }
+  .ticker-value.red { color: var(--red-urgent); }
+
+  .pulse-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green-live);
+    animation: pulse 2s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.8)} }
+  @keyframes fadeInUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes slideInLeft { from{opacity:0;transform:translateX(-30px)} to{opacity:1;transform:translateX(0)} }
+  @keyframes countUp { from{opacity:0} to{opacity:1} }
+  @keyframes scanline {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100vh); }
+  }
+  @keyframes borderGlow {
+    0%,100% { border-color: rgba(204,0,0,0.3); box-shadow: 0 0 10px rgba(204,0,0,0.1); }
+    50% { border-color: rgba(204,0,0,0.7); box-shadow: 0 0 20px rgba(204,0,0,0.3); }
+  }
+  @keyframes shimmer {
+    0% { background-position: -200% center; }
+    100% { background-position: 200% center; }
+  }
+  @keyframes progressFill {
+    from { width: 0%; }
+    to { width: var(--target-width); }
+  }
+
+  /* Scanline effect */
+  .scanline {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(204,0,0,0.3), transparent);
+    animation: scanline 6s linear infinite;
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  /* ═══════════════════════════════════
+     HERO / MASTHEAD
+  ═══════════════════════════════════ */
+  .hero {
+    padding: 60px 0 48px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-bg-accent {
+    position: absolute;
+    right: -100px;
+    top: -50px;
+    width: 500px;
+    height: 400px;
+    background: radial-gradient(ellipse, rgba(201,151,58,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .partnership-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(201,151,58,0.08);
+    border: 1px solid rgba(201,151,58,0.25);
+    border-radius: 3px;
+    padding: 5px 14px;
+    margin-bottom: 24px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--command-gold);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .wordmark {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 72px;
+    font-weight: 700;
+    line-height: 0.9;
+    letter-spacing: -1px;
+    margin-bottom: 8px;
+  }
+
+  .wordmark .bill { color: var(--text-primary); }
+  .wordmark .share {
+    background: linear-gradient(135deg, var(--cvs-red), var(--heb-red));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .wordmark-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--command-gold);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  .tagline {
+    font-size: 22px;
+    font-weight: 300;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    max-width: 580px;
+    font-style: italic;
+  }
+
+  .tagline strong { color: var(--text-primary); font-style: normal; font-weight: 600; }
+
+  /* Partnership logos row */
+  .partners-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-top: 40px;
+  }
+
+  .partner-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 24px;
+    background: var(--navy-panel);
+    border: 1px solid var(--navy-border);
+  }
+
+  .partner-logo:first-child { border-radius: 8px 0 0 8px; }
+  .partner-logo:last-child { border-radius: 0 8px 8px 0; }
+
+  .partner-divider {
+    padding: 14px 16px;
+    background: var(--navy-panel);
+    border-top: 1px solid var(--navy-border);
+    border-bottom: 1px solid var(--navy-border);
+    color: var(--text-dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+  }
+
+  .cvs-logo-text {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--cvs-red);
+    letter-spacing: -1px;
+  }
+
+  .cvs-sub {
+    font-family: 'Crimson Pro', serif;
+    font-size: 12px;
+    color: var(--text-dim);
+    font-style: italic;
+  }
+
+  .heb-logo-text {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #E31837, #FF6B00);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: 2px;
+  }
+
+  .rc-logo-text {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--command-gold-light);
+    letter-spacing: 1px;
+  }
+
+  /* ═══════════════════════════════════
+     STAT GRID
+  ═══════════════════════════════════ */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--navy-border);
+    border: 1px solid var(--navy-border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 40px 0;
+  }
+
+  .stat-cell {
+    background: var(--navy-panel);
+    padding: 24px 20px;
+    position: relative;
+    transition: background 0.2s;
+  }
+
+  .stat-cell:hover { background: var(--navy-highlight); }
+
+  .stat-cell::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+
+  .stat-cell.red::before { background: var(--cvs-red); }
+  .stat-cell.gold::before { background: var(--command-gold); }
+  .stat-cell.green::before { background: var(--green-live); }
+  .stat-cell.blue::before { background: #4488FF; }
+
+  .stat-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+
+  .stat-number {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 42px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-number.red { color: var(--cvs-red); }
+  .stat-number.gold { color: var(--command-gold-light); }
+  .stat-number.green { color: var(--green-live); }
+  .stat-number.blue { color: #6699FF; }
+
+  .stat-sub {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+
+  /* ═══════════════════════════════════
+     SECTION HEADERS
+  ═══════════════════════════════════ */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .section-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-primary);
+  }
+
+  .section-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--navy-border), transparent);
+  }
+
+  .section-badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    padding: 3px 10px;
+    border-radius: 2px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .badge-live {
+    background: rgba(34,197,94,0.12);
+    border: 1px solid rgba(34,197,94,0.3);
+    color: var(--green-live);
+  }
+
+  .badge-verified {
+    background: rgba(204,0,0,0.12);
+    border: 1px solid rgba(204,0,0,0.3);
+    color: #FF6666;
+  }
+
+  /* ═══════════════════════════════════
+     ACTIVE CAMPAIGNS
+  ═══════════════════════════════════ */
+  .campaigns-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 60px;
+  }
+
+  .campaign-card {
+    background: var(--navy-panel);
+    border: 1px solid var(--navy-border);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+    animation: fadeInUp 0.5s ease both;
+  }
+
+  .campaign-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(204,0,0,0.4);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(204,0,0,0.2);
+  }
+
+  .campaign-card.urgent {
+    animation: borderGlow 3s ease-in-out infinite, fadeInUp 0.5s ease both;
+  }
+
+  .card-top-bar {
+    height: 3px;
+    background: linear-gradient(90deg, var(--cvs-red), var(--heb-red));
+  }
+
+  .card-top-bar.funded { background: linear-gradient(90deg, #15803d, var(--green-live)); }
+
+  .card-body { padding: 20px; }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 14px;
+  }
+
+  .card-avatar {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+    border: 2px solid rgba(204,0,0,0.4);
+  }
+
+  .card-name { font-family: 'Rajdhani', sans-serif; font-size: 18px; font-weight: 700; }
+  .card-location { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
+
+  .urgent-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255,51,51,0.12);
+    border: 1px solid rgba(255,51,51,0.35);
+    border-radius: 3px;
+    padding: 3px 8px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--red-urgent);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .funded-badge {
+    background: rgba(34,197,94,0.1);
+    border: 1px solid rgba(34,197,94,0.3);
+    border-radius: 3px;
+    padding: 3px 8px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--green-live);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .card-med {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+
+  .card-pharmacy {
+    font-size: 12px;
+    color: #5588CC;
+    margin-bottom: 16px;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .card-story {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin-bottom: 16px;
+    font-style: italic;
+  }
+
+  .progress-container { margin-bottom: 12px; }
+
+  .progress-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+
+  .progress-raised {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--green-live);
+  }
+
+  .progress-goal {
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  .progress-bar-bg {
+    background: rgba(255,255,255,0.06);
+    border-radius: 2px;
+    height: 6px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    animation: progressFill 1.5s ease-out both;
+  }
+
+  .progress-meta {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  /* ═══════════════════════════════════
+     TRANSACTION LEDGER
+  ═══════════════════════════════════ */
+  .ledger-panel {
+    background: var(--navy-panel);
+    border: 1px solid var(--navy-border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 60px;
+  }
+
+  .ledger-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--navy-border);
+    background: rgba(8,13,26,0.5);
+  }
+
+  .ledger-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .ledger-explain {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--text-dim);
+    font-style: italic;
+    max-width: 400px;
+    text-align: right;
+  }
+
+  .ledger-cols {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1.5fr 1fr 1fr;
+    gap: 0;
+    padding: 10px 24px;
+    border-bottom: 1px solid var(--navy-border);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .ledger-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1.5fr 1fr 1fr;
+    gap: 0;
+    padding: 14px 24px;
+    border-bottom: 1px solid rgba(26,40,64,0.5);
+    align-items: center;
+    transition: background 0.15s;
+    animation: slideInLeft 0.4s ease both;
+  }
+
+  .ledger-row:hover { background: var(--navy-highlight); }
+  .ledger-row:last-child { border-bottom: none; }
+
+  .tx-patient { font-family: 'Rajdhani', sans-serif; font-size: 15px; font-weight: 600; }
+  .tx-id { font-family: 'Share Tech Mono', monospace; font-size: 11px; color: #5588CC; }
+  .tx-amount { font-family: 'Rajdhani', sans-serif; font-size: 18px; font-weight: 700; color: var(--green-live); }
+  .tx-destination { font-size: 12px; color: var(--text-secondary); }
+  .tx-time { font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--text-dim); }
+
+  .tx-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    padding: 3px 7px;
+    border-radius: 2px;
+  }
+
+  .status-delivered {
+    background: rgba(34,197,94,0.1);
+    border: 1px solid rgba(34,197,94,0.25);
+    color: var(--green-live);
+  }
+
+  .status-pending {
+    background: rgba(245,158,11,0.1);
+    border: 1px solid rgba(245,158,11,0.25);
+    color: var(--amber-warn);
+  }
+
+  /* ═══════════════════════════════════
+     TRANSPARENCY SECTION
+  ═══════════════════════════════════ */
+  .transparency-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 60px;
+  }
+
+  .transparency-card {
+    background: var(--navy-panel);
+    border: 1px solid var(--navy-border);
+    border-radius: 8px;
+    padding: 28px 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .transparency-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--cvs-red);
+  }
+
+  .transparency-card:nth-child(2)::before { background: var(--command-gold); }
+  .transparency-card:nth-child(3)::before { background: var(--green-live); }
+
+  .transparency-icon {
+    font-size: 32px;
+    margin-bottom: 16px;
+  }
+
+  .transparency-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    color: var(--text-primary);
+  }
+
+  .transparency-body {
+    font-size: 15px;
+    color: var(--text-secondary);
+    line-height: 1.65;
+  }
+
+  /* ═══════════════════════════════════
+     COMMUNITY POOL
+  ═══════════════════════════════════ */
+  .pool-panel {
+    background: linear-gradient(135deg, #0D1528 0%, #0D1E0A 100%);
+    border: 1px solid rgba(34,197,94,0.2);
+    border-radius: 8px;
+    padding: 32px;
+    display: flex;
+    gap: 48px;
+    align-items: center;
+    margin-bottom: 60px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .pool-panel::before {
+    content: '';
+    position: absolute;
+    top: -30%;
+    right: -10%;
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, rgba(34,197,94,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .pool-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: rgba(34,197,94,0.6);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .pool-amount {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 64px;
+    font-weight: 700;
+    color: var(--green-live);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .pool-sub {
+    font-size: 16px;
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+
+  .pool-stats {
+    display: flex;
+    gap: 40px;
+    flex: 1;
+  }
+
+  .pool-stat { text-align: center; }
+
+  .pool-stat-num {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .pool-stat-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  .pool-deploy-btn {
+    background: rgba(34,197,94,0.12);
+    border: 1px solid rgba(34,197,94,0.35);
+    border-radius: 6px;
+    padding: 14px 28px;
+    color: var(--green-live);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-left: auto;
+  }
+
+  .pool-deploy-btn:hover {
+    background: rgba(34,197,94,0.2);
+    box-shadow: 0 0 20px rgba(34,197,94,0.2);
+  }
+
+  /* ═══════════════════════════════════
+     DONATE PANEL (selected campaign)
+  ═══════════════════════════════════ */
+  .donate-panel {
+    background: var(--navy-panel);
+    border: 1px solid var(--navy-border);
+    border-radius: 8px;
+    padding: 28px 24px;
+  }
+
+  .donate-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+
+  .donate-subtitle {
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-style: italic;
+    margin-bottom: 20px;
+  }
+
+  .amount-pills {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .amount-pill {
+    padding: 8px 20px;
+    border-radius: 4px;
+    border: 1px solid var(--navy-border);
+    background: var(--navy-mid);
+    color: var(--text-secondary);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .amount-pill:hover, .amount-pill.active {
+    background: rgba(204,0,0,0.15);
+    border-color: var(--cvs-red);
+    color: var(--text-primary);
+  }
+
+  .donate-input {
+    width: 100%;
+    background: var(--navy-mid);
+    border: 1px solid var(--navy-border);
+    border-radius: 4px;
+    padding: 12px 16px;
+    color: var(--text-primary);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 18px;
+    outline: none;
+    margin-bottom: 16px;
+    transition: border-color 0.15s;
+  }
+
+  .donate-input:focus { border-color: var(--cvs-red); }
+
+  .donate-btn {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--cvs-red), var(--heb-red));
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 10px;
+  }
+
+  .donate-btn:hover { filter: brightness(1.1); box-shadow: 0 6px 24px rgba(204,0,0,0.35); }
+
+  .donate-fine {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: center;
+    line-height: 1.6;
+    letter-spacing: 0.5px;
+  }
+
+  /* ═══════════════════════════════════
+     HOW IT WORKS
+  ═══════════════════════════════════ */
+  .flow-diagram {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 60px;
+    background: var(--navy-panel);
+    border: 1px solid var(--navy-border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .flow-step {
+    flex: 1;
+    padding: 28px 20px;
+    text-align: center;
+    position: relative;
+    border-right: 1px solid var(--navy-border);
+  }
+
+  .flow-step:last-child { border-right: none; }
+
+  .flow-step-num {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 48px;
+    font-weight: 700;
+    color: rgba(204,0,0,0.2);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .flow-step-icon { font-size: 28px; margin-bottom: 8px; }
+
+  .flow-step-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+  }
+
+  .flow-step-body {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .flow-arrow {
+    color: var(--text-dim);
+    font-size: 18px;
+    flex-shrink: 0;
+    display: none;
+  }
+
+  /* ═══════════════════════════════════
+     FOOTER
+  ═══════════════════════════════════ */
+  .footer {
+    border-top: 1px solid var(--navy-border);
+    padding: 32px 0;
+    text-align: center;
+  }
+
+  .footer-wordmark {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    margin-bottom: 6px;
+  }
+
+  .footer-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .footer-copy {
+    font-size: 13px;
+    color: var(--text-dim);
+    font-style: italic;
+  }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(8,13,26,0.9);
+    backdrop-filter: blur(8px);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .modal-overlay.open { display: flex; }
+
+  .modal-box {
+    background: var(--navy-panel);
+    border: 1px solid var(--navy-border);
+    border-radius: 10px;
+    width: 100%;
+    max-width: 520px;
+    overflow: hidden;
+    animation: fadeInUp 0.3s ease;
+  }
+
+  .modal-top-bar {
+    height: 3px;
+    background: linear-gradient(90deg, var(--cvs-red), var(--heb-red));
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--navy-border);
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 22px;
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+
+  .modal-close:hover { color: var(--text-primary); }
+
+  .modal-body { padding: 24px; }
+
+  .modal-success {
+    text-align: center;
+    padding: 40px 24px;
+    display: none;
+  }
+
+  .modal-success.show { display: block; }
+  .modal-form.hide { display: none; }
+
+  .success-icon {
+    font-size: 56px;
+    margin-bottom: 16px;
+    animation: fadeInUp 0.4s ease;
+  }
+
+  .success-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--green-live);
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .success-tx {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 16px;
+    color: #5588CC;
+    background: var(--navy-mid);
+    padding: 12px 20px;
+    border-radius: 4px;
+    margin: 16px auto;
+    display: inline-block;
+    letter-spacing: 2px;
+  }
+
+  .success-note {
+    font-size: 13px;
+    color: var(--text-dim);
+    font-style: italic;
+    margin-top: 8px;
+    line-height: 1.6;
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .campaigns-grid { grid-template-columns: repeat(2, 1fr); }
+    .stat-grid { grid-template-columns: repeat(2, 1fr); }
+    .transparency-grid { grid-template-columns: 1fr; }
+    .flow-diagram { flex-direction: column; }
+    .flow-step { border-right: none; border-bottom: 1px solid var(--navy-border); }
+    .pool-panel { flex-direction: column; gap: 24px; }
+    .pool-stats { justify-content: center; }
+    .wordmark { font-size: 52px; }
+  }
+
+  @media (max-width: 600px) {
+    .campaigns-grid { grid-template-columns: 1fr; }
+    .stat-grid { grid-template-columns: repeat(2, 1fr); }
+    .ledger-cols, .ledger-row { grid-template-columns: 1.5fr 1fr 1fr; }
+    .ledger-cols span:nth-child(4),
+    .ledger-cols span:nth-child(5),
+    .ledger-row div:nth-child(4),
+    .ledger-row div:nth-child(5) { display: none; }
+    .partners-row { flex-direction: column; }
+    .partner-logo, .partner-logo:first-child, .partner-logo:last-child { border-radius: 0; }
+    .partner-logo:first-child { border-radius: 8px 8px 0 0; }
+    .partner-logo:last-child { border-radius: 0 0 8px 8px; }
+    .pool-stats { flex-wrap: wrap; gap: 20px; justify-content: center; }
+    .wordmark { font-size: 38px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="scanline"></div>
+
+<!-- COMMAND BAR -->
+<div class="command-bar">
+  <div class="command-bar-inner">
+    <div class="ticker-item">
+      <div class="pulse-dot"></div>
+      <span class="ticker-label">System</span>
+      <span class="ticker-value green">OPERATIONAL</span>
+    </div>
+    <div class="ticker-item">
+      <span class="ticker-label">Lives Helped</span>
+      <span class="ticker-value gold" id="ticker-lives">0</span>
+    </div>
+    <div class="ticker-item">
+      <span class="ticker-label">Deployed Today</span>
+      <span class="ticker-value green">$4,820</span>
+    </div>
+    <div class="ticker-item">
+      <span class="ticker-label">Active Cases</span>
+      <span class="ticker-value red">7</span>
+    </div>
+    <div class="ticker-item" style="border-right:none; margin-left:auto;">
+      <span class="ticker-label">Community Pool</span>
+      <span class="ticker-value gold">$14,820</span>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="container">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-bg-accent"></div>
+    <div class="partnership-badge">
+      <div class="pulse-dot"></div>
+      PARTNERSHIP PLATFORM CONCEPT — CONFIDENTIAL PREVIEW
+    </div>
+    <div class="wordmark">
+      <span class="bill">BILL</span><span class="share">SHARE</span>
+    </div>
+    <div class="wordmark-sub">Resiliency Command · Medication Access Network</div>
+    <p class="tagline">
+      When someone can't afford life-saving medication, <strong>every dollar donated goes directly to the pharmacy.</strong> No middleman. No cash to patients. Every cent tracked, every transaction verified.
+    </p>
+    <div class="partners-row">
+      <div class="partner-logo">
+        <div>
+          <div class="cvs-logo-text">CVS</div>
+        </div>
+        <div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;color:#CC0000;">PHARMACY</div>
+          <div class="cvs-sub">Verified Billing Partner</div>
+        </div>
+      </div>
+      <div class="partner-divider">+</div>
+      <div class="partner-logo">
+        <div>
+          <div class="heb-logo-text">H‑E‑B</div>
+        </div>
+        <div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;color:#E31837;">PHARMACY</div>
+          <div class="cvs-sub">Texas Community Partner</div>
+        </div>
+      </div>
+      <div class="partner-divider">×</div>
+      <div class="partner-logo">
+        <div>
+          <div class="rc-logo-text">RESILIENCY COMMAND</div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:2px;margin-top:2px;">PLATFORM OPERATOR</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stat-grid">
+    <div class="stat-cell red">
+      <div class="stat-label">Patients Helped</div>
+      <div class="stat-number red" id="stat1">312</div>
+      <div class="stat-sub">since platform launch</div>
+    </div>
+    <div class="stat-cell gold">
+      <div class="stat-label">Funds Deployed</div>
+      <div class="stat-number gold">$482K</div>
+      <div class="stat-sub">directly to pharmacies</div>
+    </div>
+    <div class="stat-cell green">
+      <div class="stat-label">Transparency Rate</div>
+      <div class="stat-number green">100%</div>
+      <div class="stat-sub">every tx auditable</div>
+    </div>
+    <div class="stat-cell blue">
+      <div class="stat-label">Platform Fee</div>
+      <div class="stat-number blue">0%</div>
+      <div class="stat-sub">on critical medications</div>
+    </div>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <div class="section-header">
+    <div class="section-title">How It Works</div>
+    <div class="section-line"></div>
+    <div class="section-badge badge-verified">Transparency Model</div>
+  </div>
+
+  <div class="flow-diagram">
+    <div class="flow-step">
+      <div class="flow-step-num">01</div>
+      <div class="flow-step-icon">🏥</div>
+      <div class="flow-step-title">Patient Posts Need</div>
+      <div class="flow-step-body">Verified identity + prescription details submitted via BillShare app or social media.</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-num">02</div>
+      <div class="flow-step-icon">✅</div>
+      <div class="flow-step-title">CVS/HEB Verifies</div>
+      <div class="flow-step-body">Pharmacy partner confirms medication, dosage, and monthly cost. Case goes live.</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-num">03</div>
+      <div class="flow-step-icon">💳</div>
+      <div class="flow-step-title">Donors Contribute</div>
+      <div class="flow-step-body">Donations route directly to the CVS/HEB billing system. Patient never touches funds.</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-num">04</div>
+      <div class="flow-step-icon">🔍</div>
+      <div class="flow-step-title">Full Transparency</div>
+      <div class="flow-step-body">Every donor receives a CVS/HEB Transaction ID. Verifiable independently, forever.</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-num">05</div>
+      <div class="flow-step-icon">🌊</div>
+      <div class="flow-step-title">Overflow Pools</div>
+      <div class="flow-step-body">Excess funds enter the Community Pool, auto-deployed to the next urgent case.</div>
+    </div>
+  </div>
+
+  <!-- ACTIVE CAMPAIGNS -->
+  <div class="section-header">
+    <div class="section-title">Active Cases</div>
+    <div class="section-line"></div>
+    <div class="section-badge badge-live">
+      <div class="pulse-dot" style="display:inline-block;margin-right:5px;vertical-align:middle;"></div>
+      LIVE FEED
+    </div>
+  </div>
+
+  <div class="campaigns-grid">
+
+    <!-- Card 1: URGENT -->
+    <div class="campaign-card urgent" onclick="openDonate('Maria T.', 'Insulin (Humalog)', 'CVS #4821 — McDowell Rd, Phoenix AZ', 2500, 1840)">
+      <div class="card-top-bar"></div>
+      <div class="card-body">
+        <div class="card-header">
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <div class="card-avatar" style="background:linear-gradient(135deg,#7f1d1d,#cc0000);">MT</div>
+            <div>
+              <div class="card-name">Maria T.</div>
+              <div class="card-location">Phoenix, AZ</div>
+            </div>
+          </div>
+          <div class="urgent-badge">
+            <div class="pulse-dot"></div>
+            3 DAYS
+          </div>
+        </div>
+        <div class="card-med">Insulin — Humalog 100u/mL</div>
+        <div class="card-pharmacy">📍 CVS #4821 — McDowell Rd, Phoenix AZ</div>
+        <div class="card-story">"Type 1 diabetic since age 9. Lost insurance during husband's job transition. Two children at home."</div>
+        <div class="progress-container">
+          <div class="progress-row">
+            <span class="progress-raised">$1,840</span>
+            <span class="progress-goal">of $2,500/mo</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" style="--target-width:73.6%;width:73.6%;background:linear-gradient(90deg,#7f1d1d,#cc0000);"></div>
+          </div>
+          <div class="progress-meta">
+            <span>73% FUNDED</span>
+            <span>47 DONORS</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2: FUNDED -->
+    <div class="campaign-card" onclick="openDonate('DeShawn R.', 'Eliquis 5mg', 'CVS #2219 — Peachtree St, Atlanta GA', 580, 580)">
+      <div class="card-top-bar funded"></div>
+      <div class="card-body">
+        <div class="card-header">
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <div class="card-avatar" style="background:linear-gradient(135deg,#064e3b,#15803d);">DR</div>
+            <div>
+              <div class="card-name">DeShawn R.</div>
+              <div class="card-location">Atlanta, GA</div>
+            </div>
+          </div>
+          <div class="funded-badge">✓ FUNDED</div>
+        </div>
+        <div class="card-med">Eliquis 5mg — Blood Thinner</div>
+        <div class="card-pharmacy">📍 CVS #2219 — Peachtree St, Atlanta GA</div>
+        <div class="card-story">"Post-stroke patient. Medicaid gap while appeal is pending. Without blood thinners, another stroke is likely."</div>
+        <div class="progress-container">
+          <div class="progress-row">
+            <span class="progress-raised" style="color:var(--green-live);">$580</span>
+            <span class="progress-goal">of $580/mo</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" style="--target-width:100%;width:100%;background:linear-gradient(90deg,#15803d,#22c55e);"></div>
+          </div>
+          <div class="progress-meta">
+            <span style="color:var(--green-live);">100% — FULLY FUNDED</span>
+            <span>12 DONORS</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 3: URGENT -->
+    <div class="campaign-card urgent" onclick="openDonate('Linda C.', 'Keytruda Immunotherapy', 'CVS Specialty #0091', 12000, 3200)">
+      <div class="card-top-bar"></div>
+      <div class="card-body">
+        <div class="card-header">
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <div class="card-avatar" style="background:linear-gradient(135deg,#312e81,#4338ca);">LC</div>
+            <div>
+              <div class="card-name">Linda C.</div>
+              <div class="card-location">Houston, TX</div>
+            </div>
+          </div>
+          <div class="urgent-badge">
+            <div class="pulse-dot"></div>
+            11 DAYS
+          </div>
+        </div>
+        <div class="card-med">Keytruda — Cancer Immunotherapy</div>
+        <div class="card-pharmacy">📍 CVS Specialty #0091 — Houston TX</div>
+        <div class="card-story">"Stage 2 breast cancer. Between insurance plans after job loss. Next infusion is in 11 days."</div>
+        <div class="progress-container">
+          <div class="progress-row">
+            <span class="progress-raised">$3,200</span>
+            <span class="progress-goal">of $12,000/mo</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" style="--target-width:26.7%;width:26.7%;background:linear-gradient(90deg,#1e3a8a,#5b8cff);"></div>
+          </div>
+          <div class="progress-meta">
+            <span>27% FUNDED</span>
+            <span>89 DONORS</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- TRANSPARENCY SECTION -->
+  <div class="section-header">
+    <div class="section-title">Our Transparency Promise</div>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="transparency-grid">
+    <div class="transparency-card">
+      <div class="transparency-icon">🔐</div>
+      <div class="transparency-title">Zero Patient Cash</div>
+      <div class="transparency-body">The person in need never receives funds directly. Every donation is paid directly into the pharmacy's billing system against a specific prescription order. This eliminates fraud, builds donor trust, and protects recipients from liability.</div>
+    </div>
+    <div class="transparency-card">
+      <div class="transparency-icon">🔗</div>
+      <div class="transparency-title">Every Cent Has a Tracking ID</div>
+      <div class="transparency-body">Each transaction generates a unique CVS or H-E-B Pharmacy Transaction ID — verifiable independently through the pharmacy's customer support or digital portal. Donors can confirm their money reached the medication at any time, forever.</div>
+    </div>
+    <div class="transparency-card">
+      <div class="transparency-icon">🌊</div>
+      <div class="transparency-title">Overflow Benefits Everyone</div>
+      <div class="transparency-body">When a campaign is fully funded, overflow doesn't disappear — it flows into the Community Pool, a transparent reserve deployed to the next verified urgent case. The pool balance is public, real-time, and auditable.</div>
+    </div>
+  </div>
+
+  <!-- LIVE LEDGER -->
+  <div class="section-header">
+    <div class="section-title">Live Transaction Ledger</div>
+    <div class="section-line"></div>
+    <div class="section-badge badge-verified">CVS / HEB Verified</div>
+  </div>
+
+  <div class="ledger-panel">
+    <div class="ledger-header">
+      <div class="ledger-title">Pharmacy Payment Feed</div>
+      <div class="ledger-explain">All payments route directly to CVS or H-E-B billing. Patient never handles funds. Verify any TX-ID with pharmacy support.</div>
+    </div>
+    <div class="ledger-cols">
+      <span>Patient / Pharmacy</span>
+      <span>Amount</span>
+      <span>Transaction ID</span>
+      <span>Time</span>
+      <span>Status</span>
+    </div>
+    <div class="ledger-row" style="animation-delay:0.1s">
+      <div>
+        <div class="tx-patient">Maria T. → CVS #4821</div>
+        <div class="tx-id">Phoenix, AZ · Insulin Humalog</div>
+      </div>
+      <div class="tx-amount">$200</div>
+      <div class="tx-id">CVS-TX-00291A</div>
+      <div class="tx-time">2h ago</div>
+      <div><span class="tx-status status-delivered">● DELIVERED</span></div>
+    </div>
+    <div class="ledger-row" style="animation-delay:0.2s">
+      <div>
+        <div class="tx-patient">Linda C. → CVS Specialty</div>
+        <div class="tx-id">Houston, TX · Keytruda Infusion</div>
+      </div>
+      <div class="tx-amount">$1,000</div>
+      <div class="tx-id">CVS-TX-00301E</div>
+      <div class="tx-time">6h ago</div>
+      <div><span class="tx-status status-delivered">● DELIVERED</span></div>
+    </div>
+    <div class="ledger-row" style="animation-delay:0.3s">
+      <div>
+        <div class="tx-patient">Ramon V. → H-E-B Pharmacy</div>
+        <div class="tx-id">San Antonio, TX · Ozempic 1mg</div>
+      </div>
+      <div class="tx-amount">$380</div>
+      <div class="tx-id">HEB-TX-00118C</div>
+      <div class="tx-time">8h ago</div>
+      <div><span class="tx-status status-delivered">● DELIVERED</span></div>
+    </div>
+    <div class="ledger-row" style="animation-delay:0.4s">
+      <div>
+        <div class="tx-patient">Maria T. → CVS #4821</div>
+        <div class="tx-id">Phoenix, AZ · Insulin Humalog</div>
+      </div>
+      <div class="tx-amount">$500</div>
+      <div class="tx-id">CVS-TX-00281C</div>
+      <div class="tx-time">1d ago</div>
+      <div><span class="tx-status status-delivered">● DELIVERED</span></div>
+    </div>
+    <div class="ledger-row" style="animation-delay:0.5s">
+      <div>
+        <div class="tx-patient">Community Pool → DeShawn R.</div>
+        <div class="tx-id">Atlanta, GA · Eliquis 5mg (Auto-Deploy)</div>
+      </div>
+      <div class="tx-amount">$580</div>
+      <div class="tx-id">CVS-TX-00241D</div>
+      <div class="tx-time">3d ago</div>
+      <div><span class="tx-status status-delivered">● DELIVERED</span></div>
+    </div>
+    <div class="ledger-row" style="animation-delay:0.6s">
+      <div>
+        <div class="tx-patient">Patricia N. → H-E-B Pharmacy</div>
+        <div class="tx-id">Austin, TX · Humira Pen (Pending)</div>
+      </div>
+      <div class="tx-amount">$750</div>
+      <div class="tx-id">HEB-TX-00122F</div>
+      <div class="tx-time">In Queue</div>
+      <div><span class="tx-status status-pending">◌ ROUTING</span></div>
+    </div>
+  </div>
+
+  <!-- COMMUNITY POOL -->
+  <div class="section-header">
+    <div class="section-title">Community Pool</div>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="pool-panel">
+    <div>
+      <div class="pool-label">Available Reserve</div>
+      <div class="pool-amount">$14,820</div>
+      <div class="pool-sub">Overflow from fully funded campaigns</div>
+    </div>
+    <div class="pool-stats">
+      <div class="pool-stat">
+        <div class="pool-stat-num">312</div>
+        <div class="pool-stat-label">Lives Helped</div>
+      </div>
+      <div class="pool-stat">
+        <div class="pool-stat-num">47</div>
+        <div class="pool-stat-label">This Month</div>
+      </div>
+      <div class="pool-stat">
+        <div class="pool-stat-num">$0</div>
+        <div class="pool-stat-label">Platform Fee (Critical Rx)</div>
+      </div>
+    </div>
+    <button class="pool-deploy-btn">Deploy Funds →</button>
+  </div>
+
+</div><!-- /container -->
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="container">
+    <div class="footer-wordmark">
+      <span style="color:var(--text-primary);">BILL</span><span style="color:var(--cvs-red);">SHARE</span>
+    </div>
+    <div class="footer-sub">Resiliency Command · Medication Access Network</div>
+    <div class="footer-copy">A partnership platform concept connecting CVS Pharmacy, H-E-B Pharmacy, and community donors to ensure life-saving medications are never out of reach.</div>
+    <div style="margin-top:20px;display:flex;justify-content:center;gap:20px;flex-wrap:wrap;">
+      <span style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:2px;">CONFIDENTIAL PREVIEW</span>
+      <span style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:2px;">·</span>
+      <span style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:2px;">NOT FOR PUBLIC DISTRIBUTION</span>
+      <span style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:2px;">·</span>
+      <span style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:2px;">© 2026 RESILIENCY COMMAND</span>
+    </div>
+  </div>
+</div>
+
+<!-- DONATE MODAL -->
+<div class="modal-overlay" id="donateModal" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box">
+    <div class="modal-top-bar"></div>
+    <div class="modal-header">
+      <div>
+        <div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;letter-spacing:1px;text-transform:uppercase;" id="modal-title">Send Funds</div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-dim);margin-top:2px;" id="modal-sub">Direct to pharmacy billing</div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+
+    <div class="modal-body modal-form" id="modalForm">
+      <div style="background:rgba(26,40,64,0.5);border:1px solid var(--navy-border);border-radius:6px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:var(--text-secondary);line-height:1.6;">
+        💡 Your donation goes <strong style="color:#5588CC;">directly to the pharmacy's billing system.</strong> The patient never receives or handles funds. You'll receive a verified Transaction ID to confirm delivery independently.
+      </div>
+      <div style="margin-bottom:6px;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;">Select Amount</div>
+      <div class="amount-pills">
+        <button class="amount-pill" onclick="setAmt(this,'25')">$25</button>
+        <button class="amount-pill" onclick="setAmt(this,'50')">$50</button>
+        <button class="amount-pill" onclick="setAmt(this,'100')">$100</button>
+        <button class="amount-pill" onclick="setAmt(this,'250')">$250</button>
+        <button class="amount-pill" onclick="setAmt(this,'500')">$500</button>
+      </div>
+      <input class="donate-input" id="donateAmount" type="number" placeholder="Custom amount ($)" oninput="clearPills()">
+      <button class="donate-btn" onclick="submitDonate()">SEND DIRECTLY TO PHARMACY →</button>
+      <div class="donate-fine">FUNDS ROUTE INSTANTLY TO CVS / H-E-B BILLING SYSTEM · 0% PLATFORM FEE ON CRITICAL MEDICATIONS<br>TRANSACTION ID ISSUED WITHIN 60 SECONDS · INDEPENDENTLY VERIFIABLE WITH PHARMACY SUPPORT</div>
+    </div>
+
+    <div class="modal-success" id="modalSuccess">
+      <div class="success-icon">✅</div>
+      <div class="success-title">Delivered to Pharmacy</div>
+      <div style="font-size:16px;color:var(--text-secondary);margin-bottom:4px;">Your Transaction ID:</div>
+      <div class="success-tx" id="successTxId">CVS-TX-XXXXXX</div>
+      <div class="success-note">
+        Save this ID. You can verify with CVS or H-E-B customer support at any time that these funds were applied to the patient's prescription — not to anything else.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Ticker counter animation
+function animateCount(el, target, prefix, suffix, duration) {
+  const start = 0;
+  const step = target / (duration / 16);
+  let current = 0;
+  const timer = setInterval(() => {
+    current = Math.min(current + step, target);
+    el.textContent = prefix + Math.floor(current).toLocaleString() + suffix;
+    if (current >= target) clearInterval(timer);
+  }, 16);
+}
+
+window.addEventListener('load', () => {
+  const tickerLives = document.getElementById('ticker-lives');
+  animateCount(tickerLives, 312, '', '', 1500);
+});
+
+// Modal logic
+let currentPatient = '';
+function openDonate(name, med, pharmacy, goal, raised) {
+  currentPatient = name;
+  document.getElementById('modal-title').textContent = 'Send Funds for ' + name.split(' ')[0];
+  document.getElementById('modal-sub').textContent = med + ' · ' + pharmacy;
+  document.getElementById('modalForm').classList.remove('hide');
+  document.getElementById('modalSuccess').classList.remove('show');
+  document.getElementById('donateAmount').value = '';
+  document.querySelectorAll('.amount-pill').forEach(p => p.classList.remove('active'));
+  document.getElementById('donateModal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('donateModal').classList.remove('open');
+}
+
+function setAmt(btn, val) {
+  document.querySelectorAll('.amount-pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('donateAmount').value = val;
+}
+
+function clearPills() {
+  document.querySelectorAll('.amount-pill').forEach(p => p.classList.remove('active'));
+}
+
+function submitDonate() {
+  const amt = document.getElementById('donateAmount').value;
+  if (!amt || parseFloat(amt) <= 0) {
+    document.getElementById('donateAmount').style.borderColor = 'var(--cvs-red)';
+    setTimeout(() => document.getElementById('donateAmount').style.borderColor = '', 1200);
+    return;
+  }
+  document.getElementById('modalForm').classList.add('hide');
+  const txId = 'CVS-TX-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+  document.getElementById('successTxId').textContent = txId;
+  document.getElementById('modalSuccess').classList.add('show');
+}
+</script>
+
+</body>
+</html>
